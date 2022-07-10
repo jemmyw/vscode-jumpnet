@@ -25,6 +25,10 @@
       {
         "command": "jumpnet.related",
         "title": "JumpNet Related"
+      },
+      {
+        "command": "jumpnet.reset",
+        "title": "JumpNet Reset"
       }
     ],
     "viewsContainers": {
