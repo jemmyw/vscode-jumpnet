@@ -1,6 +1,6 @@
 {
   "name": "jumpnet",
-  "displayName": "jumpnet",
+  "displayName": "JumpNet",
   "publisher": "jemmyw",
   "author": {
     "name": "Jeremy Wells",
@@ -41,7 +41,7 @@
         {
           "id": "jumpnet.relatedTree",
           "type": "tree",
-          "name": "JumpNet related"
+          "name": "Related"
         }
       ]
     }

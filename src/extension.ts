@@ -9,29 +9,52 @@ import { Vertex, WeightedGraph } from "./WeightedGraph";
 
 const SCHEMA_VERSION = "1.0";
 
-class RelatedTreeFile {}
+class RelatedTreeFile {
+  constructor(public uri: vscode.Uri) {}
+}
 
 class RelatedTreeDataProvider
   implements vscode.TreeDataProvider<RelatedTreeFile>
 {
-  constructor(private jumpnet: JumpNet) {}
+  constructor(private jumpnet: JumpNet) {
+    jumpnet.context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(() => {
+        this._onDidChangeTreeData.fire();
+      })
+    );
+  }
 
-  onDidChangeTreeData?:
-    | vscode.Event<
-        void | RelatedTreeFile | RelatedTreeFile[] | null | undefined
-      >
-    | undefined;
+  private _onDidChangeTreeData: vscode.EventEmitter<undefined | null | void> =
+    new vscode.EventEmitter<undefined | null | void>();
+  readonly onDidChangeTreeData: vscode.Event<undefined | null | void> =
+    this._onDidChangeTreeData.event;
+
   getTreeItem(
     element: RelatedTreeFile
   ): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    console.log("getTreeItem", element);
-    throw new Error("Method not implemented.");
+    const { uri } = element;
+    const relativePath = vscode.workspace.asRelativePath(uri);
+
+    return {
+      id: uri.fsPath,
+      resourceUri: uri,
+      description: path.dirname(relativePath),
+      command: { title: "Open", command: "vscode.open", arguments: [uri] },
+    };
   }
   getChildren(
     element?: RelatedTreeFile | undefined
   ): vscode.ProviderResult<RelatedTreeFile[]> {
-    console.log("getChildren", element);
-    throw new Error("Method not implemented.");
+    if (element) return [];
+
+    const uri = vscode.window.activeTextEditor?.document.uri;
+    if (!uri) return [];
+
+    const related = this.jumpnet.relatedFiles(uri, 50);
+
+    return related.map((uri) => {
+      return new RelatedTreeFile(uri);
+    });
   }
 }
 
