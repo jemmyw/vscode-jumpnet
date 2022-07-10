@@ -6,8 +6,13 @@
     "name": "Jeremy Wells",
     "url": "https://github.com/jemmyw"
   },
-  "description": "",
-  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jemmyw/vscode-jumpnet.git"
+  },
+  "homepage": "https://github.com/jemmyw/vscode-jumpnet",
+  "description": "Jumplist of files built from your navigation history",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.69.0"
   },
@@ -16,19 +21,25 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onWebviewPanel:jumpnet.graph",
-    "onCommand:jumpnet.related"
+    "onWebviewPanel:jumpnet.relatedTree",
+    "onCommand:jumpnet.related",
+    "onCommand:jumpnet.reset",
+    "onCommand:jumpnet.cull"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "jumpnet.related",
-        "title": "JumpNet Related"
+        "title": "JumpNet: Related"
       },
       {
         "command": "jumpnet.reset",
-        "title": "JumpNet Reset"
+        "title": "JumpNet: Reset"
+      },
+      {
+        "command": "jumpnet.cull",
+        "title": "JumpNet: Cull"
       }
     ],
     "viewsContainers": {

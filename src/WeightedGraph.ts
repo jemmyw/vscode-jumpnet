@@ -5,7 +5,7 @@ export interface Vertex {
 }
 
 export interface ConnectedEdge {
-  id: EdgeId;
+  id: string;
   vertexIds: [string, string];
   weight: number;
 }
@@ -54,24 +54,24 @@ function objectToMap(obj: { [index: string]: any }) {
 }
 
 export class WeightedGraph<V extends Vertex> extends EventEmitter {
-  verts = new Map<string, V>();
-  edges = new Map<EdgeId, Edge>();
-  edgeMap = new Map<string, Set<EdgeId>>();
+  private _verts = new Map<string, V>();
+  private _edges = new Map<EdgeId, Edge>();
+  private _edgeMap = new Map<string, Set<EdgeId>>();
 
   constructor() {
     super();
   }
 
   clear() {
-    this.verts.clear();
-    this.edges.clear();
-    this.edgeMap.clear();
+    this._verts.clear();
+    this._edges.clear();
+    this._edgeMap.clear();
     this.emit("onClear");
   }
 
   addVertex(vertex: V) {
     const { id } = vertex;
-    this.verts.set(id, vertex);
+    this._verts.set(id, vertex);
 
     this.emit("onVertexAdded", id);
   }
@@ -83,42 +83,68 @@ export class WeightedGraph<V extends Vertex> extends EventEmitter {
       throw new Error("Must add vertex before adding edges");
     }
     const id = edgeId(fromId, toId);
-    this.edges.set(id, {
+    this._edges.set(id, {
       id: id,
       vertexIds: [fromId, toId],
       weight,
     });
-    this.edgeMap.set(fromId, (this.edgeMap.get(fromId) || new Set()).add(id));
-    this.edgeMap.set(toId, (this.edgeMap.get(toId) || new Set()).add(id));
+    this._edgeMap.set(fromId, (this._edgeMap.get(fromId) || new Set()).add(id));
+    this._edgeMap.set(toId, (this._edgeMap.get(toId) || new Set()).add(id));
 
     this.emit("onEdgeAdded", id);
   }
 
+  deleteEdge(from: IdOrVertex, to: IdOrVertex): void {
+    const id = edgeId(from, to);
+    this._edges.delete(id);
+    this._edgeMap.get(vertexToId(from))?.delete(id);
+    this._edgeMap.get(vertexToId(to))?.delete(id);
+  }
+
+  deleteVertex(id: IdOrVertex) {
+    for (let edgeId of (
+      this._edgeMap.get(vertexToId(id)) || new Set()
+    ).values()) {
+      this._edges.delete(edgeId);
+    }
+
+    this._edgeMap.delete(vertexToId(id));
+    this._verts.delete(vertexToId(id));
+  }
+
   addToEdge(from: IdOrVertex, to: IdOrVertex, weight: number) {
     const id = edgeId(from, to);
-    const edge = this.edges.get(id);
+    const edge = this._edges.get(id);
     this.addEdge(from, to, (edge?.weight || 0) + weight);
   }
 
   hasVertex(id: IdOrVertex) {
-    return this.verts.has(vertexToId(id));
+    return this._verts.has(vertexToId(id));
   }
 
   isConnected(from: IdOrVertex, to: IdOrVertex) {
-    return this.edges.has(edgeId(from, to));
+    return this._edges.has(edgeId(from, to));
   }
 
   getVertex(id: string) {
-    return this.verts.get(id);
+    return this._verts.get(id);
   }
 
   getEdge(id: EdgeId) {
-    return this.edges.get(id) || nullEdge;
+    return this._edges.get(id) || nullEdge;
+  }
+
+  edges() {
+    return this._edges.values();
+  }
+
+  vertices() {
+    return this._verts.values();
   }
 
   vertexEdges(id: IdOrVertex): ConnectedEdge[] {
     const vertId = vertexToId(id);
-    const edgeIds = this.edgeMap.get(vertId) || new Set();
+    const edgeIds = this._edgeMap.get(vertId) || new Set();
     return [...edgeIds]
       .map(this.getEdge.bind(this))
       .filter(isConnectedEdge)
@@ -145,7 +171,7 @@ export class WeightedGraph<V extends Vertex> extends EventEmitter {
   }
 
   validate() {
-    this.edges.forEach((edge) => {
+    this._edges.forEach((edge) => {
       if (isConnectedEdge(edge)) {
         edge.vertexIds.forEach((id) => {
           if (!this.hasVertex(id)) {
@@ -160,23 +186,23 @@ export class WeightedGraph<V extends Vertex> extends EventEmitter {
 
   toJSON() {
     return {
-      verts: mapToObject(this.verts),
-      edges: mapToObject(this.edges),
-      edgeMap: mapToObject(this.edgeMap),
+      verts: mapToObject(this._verts),
+      edges: mapToObject(this._edges),
+      edgeMap: mapToObject(this._edgeMap),
     };
   }
 
   static fromJSON<V extends Vertex>(raw: any) {
     const data = raw as {
       verts: { [index: string]: V };
-      edges: { [index: EdgeId]: Edge };
+      edges: { [index: string]: Edge };
       edgeMap: { [index: string]: EdgeId[] };
     };
     const graph = new WeightedGraph<V>();
 
-    graph.verts = objectToMap(data.verts);
-    graph.edges = objectToMap(data.edges) as any;
-    graph.edgeMap = objectToMap(data.edgeMap);
+    graph._verts = objectToMap(data.verts);
+    graph._edges = objectToMap(data.edges) as any;
+    graph._edgeMap = objectToMap(data.edgeMap);
     graph.validate();
 
     return graph;

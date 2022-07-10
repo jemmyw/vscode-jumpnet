@@ -1,6 +1,6 @@
 import { Edge, Vertex, WeightedGraph } from "./WeightedGraph";
 
-function byWeight(a: Edge, b: Edge) {
+export function byWeight(a: Edge, b: Edge) {
   return b.weight - a.weight;
 }
 

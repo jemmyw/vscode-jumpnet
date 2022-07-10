@@ -3,7 +3,7 @@ import path from "path";
 import * as vscode from "vscode";
 import { RelatedTreeDataProvider } from "./RelatedTreeView";
 import { ThrottledAction } from "./ThrottledAction";
-import { verticesByWeight } from "./util";
+import { byWeight, verticesByWeight } from "./util";
 import { Vertex, WeightedGraph } from "./WeightedGraph";
 
 export const SCHEMA_VERSION = "1.0";
@@ -61,6 +61,7 @@ export class JumpNet {
       vscode.commands.registerCommand("jumpnet.reset", () =>
         this.resetCommand()
       ),
+      vscode.commands.registerCommand("jumpnet.cull", () => this.cullCommand()),
       vscode.window.registerTreeDataProvider(
         "jumpnet.relatedTree",
         this.relatedTreeProvider
@@ -149,8 +150,20 @@ export class JumpNet {
     if (action !== "Yes") return;
 
     this.jumpGraph.clear();
-    this.saveAction.run();
     this.relatedTreeProvider.reset();
+    this.saveAction.run();
+  }
+
+  async cullCommand() {
+    for (let v of this.jumpGraph.vertices()) {
+      const edges = this.jumpGraph.vertexEdges(v).sort(byWeight).slice(10);
+      edges.forEach((edge) =>
+        this.jumpGraph.deleteEdge(edge.vertexIds[0], edge.vertexIds[1])
+      );
+    }
+
+    this.relatedTreeProvider.reset();
+    this.saveAction.run();
   }
 
   storagePath() {
