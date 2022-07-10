@@ -12,13 +12,14 @@
   },
   "homepage": "https://github.com/jemmyw/vscode-jumpnet",
   "description": "Jumplist of files built from your navigation history",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "engines": {
     "vscode": "^1.69.0"
   },
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
   "activationEvents": [
     "onStartupFinished",
     "onWebviewPanel:jumpnet.relatedTree",
