@@ -10,6 +10,7 @@ export class ThrottledAction extends EventEmitter {
   private timeout: NodeJS.Timeout | null = null;
   private running = false;
   private _lastError: any = null;
+  private disarmed = false;
 
   constructor(
     private callback: Callback,
@@ -28,7 +29,12 @@ export class ThrottledAction extends EventEmitter {
     return this._lastError;
   }
 
+  disarm() {
+    this.disarmed = true;
+  }
+
   async run() {
+    if (this.disarmed) return;
     if (this.running) {
       this.queue();
       return;

@@ -30,6 +30,29 @@ const edgeId = (from: IdOrVertex, to: IdOrVertex): EdgeId => {
   return `${fromId}-${toId}`;
 };
 
+function setToArray(set: Set<any>) {
+  return [...set];
+}
+
+function mapToObject(map: Map<string, any>) {
+  const obj: { [index: string]: any } = {};
+  map.forEach((value, key) => {
+    obj[key] = value instanceof Set ? setToArray(value) : value;
+  });
+  return obj;
+}
+
+function objectToMap(obj: { [index: string]: any }) {
+  return Object.entries(obj).reduce((map, [id, v]) => {
+    if (Array.isArray(v)) {
+      map.set(id, new Set(v));
+    } else {
+      map.set(id, v);
+    }
+    return map;
+  }, new Map<string, any>());
+}
+
 export class WeightedGraph<V extends Vertex> extends EventEmitter {
   verts = new Map<string, V>();
   edges = new Map<EdgeId, Edge>();
@@ -113,64 +136,42 @@ export class WeightedGraph<V extends Vertex> extends EventEmitter {
 
     return edges.map((edge) => this.getVertex(edge.vertexIds[1]) as V);
   }
-}
 
-function setToArray(set: Set<any>) {
-  return [...set];
-}
+  validate() {
+    this.edges.forEach((edge) => {
+      if (isConnectedEdge(edge)) {
+        edge.vertexIds.forEach((id) => {
+          if (!this.hasVertex(id)) {
+            throw new Error(
+              `Invalid edge connecting ${edge.vertexIds.join(", ")}`
+            );
+          }
+        });
+      }
+    });
+  }
 
-function mapToObject(map: Map<string, any>) {
-  const obj: { [index: string]: any } = {};
-  map.forEach((value, key) => {
-    obj[key] = value instanceof Set ? setToArray(value) : value;
-  });
-  return obj;
-}
+  toJSON() {
+    return {
+      verts: mapToObject(this.verts),
+      edges: mapToObject(this.edges),
+      edgeMap: mapToObject(this.edgeMap),
+    };
+  }
 
-export function serialize(graph: WeightedGraph<any>) {
-  const data = {
-    verts: mapToObject(graph.verts),
-    edges: mapToObject(graph.edges),
-    edgeMap: mapToObject(graph.edgeMap),
-  };
+  static fromJSON<V extends Vertex>(raw: any) {
+    const data = raw as {
+      verts: { [index: string]: V };
+      edges: { [index: EdgeId]: Edge };
+      edgeMap: { [index: string]: EdgeId[] };
+    };
+    const graph = new WeightedGraph<V>();
 
-  return JSON.stringify(data);
-}
+    graph.verts = objectToMap(data.verts);
+    graph.edges = objectToMap(data.edges) as any;
+    graph.edgeMap = objectToMap(data.edgeMap);
+    graph.validate();
 
-function objectToMap(obj: { [index: string]: any }) {
-  return Object.entries(obj).reduce((map, [id, v]) => {
-    if (Array.isArray(v)) {
-      map.set(id, new Set(v));
-    } else {
-      map.set(id, v);
-    }
-    return map;
-  }, new Map<string, any>());
-}
-
-export function deserialize<V extends Vertex>(blob: string) {
-  const data = JSON.parse(blob) as {
-    verts: { [index: string]: V };
-    edges: { [index: EdgeId]: Edge };
-    edgeMap: { [index: string]: EdgeId[] };
-  };
-  const graph = new WeightedGraph<V>();
-
-  graph.verts = objectToMap(data.verts);
-  graph.edges = objectToMap(data.edges) as any;
-  graph.edgeMap = objectToMap(data.edgeMap);
-
-  graph.edges.forEach((edge) => {
-    if (isConnectedEdge(edge)) {
-      edge.vertexIds.forEach((id) => {
-        if (!graph.hasVertex(id)) {
-          throw new Error(
-            `Invalid edge connecting ${edge.vertexIds.join(", ")}`
-          );
-        }
-      });
-    }
-  });
-
-  return graph;
+    return graph;
+  }
 }

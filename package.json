@@ -39,9 +39,9 @@
     "views": {
       "jumpnet": [
         {
-          "id": "jumpnet.graph",
-          "type": "webview",
-          "name": "Jumpnet Graph"
+          "id": "jumpnet.relatedTree",
+          "type": "tree",
+          "name": "JumpNet related"
         }
       ]
     }

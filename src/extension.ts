@@ -5,25 +5,43 @@ import path from "path";
 import * as vscode from "vscode";
 import { ThrottledAction } from "./ThrottledAction";
 import { verticesByWeight } from "./util";
-import { deserialize, serialize, Vertex, WeightedGraph } from "./WeightedGraph";
+import { Vertex, WeightedGraph } from "./WeightedGraph";
 
-class GraphProvider implements vscode.WebviewViewProvider {
-  resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext<unknown>,
-    token: vscode.CancellationToken
-  ): void | Thenable<void> {
-    console.log("bah");
+const SCHEMA_VERSION = "1.0";
+
+class RelatedTreeFile {}
+
+class RelatedTreeDataProvider
+  implements vscode.TreeDataProvider<RelatedTreeFile>
+{
+  constructor(private jumpnet: JumpNet) {}
+
+  onDidChangeTreeData?:
+    | vscode.Event<
+        void | RelatedTreeFile | RelatedTreeFile[] | null | undefined
+      >
+    | undefined;
+  getTreeItem(
+    element: RelatedTreeFile
+  ): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    console.log("getTreeItem", element);
+    throw new Error("Method not implemented.");
+  }
+  getChildren(
+    element?: RelatedTreeFile | undefined
+  ): vscode.ProviderResult<RelatedTreeFile[]> {
+    console.log("getChildren", element);
+    throw new Error("Method not implemented.");
   }
 }
 
 class FileVertex implements Vertex {
   id: string;
-  fsPath: string;
+  uri: any;
 
   constructor(uri: vscode.Uri) {
     this.id = vscode.workspace.asRelativePath(uri);
-    this.fsPath = uri.fsPath;
+    this.uri = uri.toJSON();
   }
 }
 
@@ -66,17 +84,22 @@ class JumpNet {
       vscode.commands.registerCommand("jumpnet.related", () =>
         this.relatedCommand()
       ),
-      vscode.window.registerWebviewViewProvider(
-        "jumpnet.graph",
-        new GraphProvider(),
-        {
-          webviewOptions: {},
-        }
+      vscode.window.registerTreeDataProvider(
+        "jumpnet.relatedTree",
+        new RelatedTreeDataProvider(this)
       )
     );
   }
 
-  deactivate() {}
+  async deactivate() {
+    await new Promise<void>((resolve) => {
+      this.saveAction.once("onAfterRun", () => {
+        this.saveAction.disarm();
+        resolve();
+      });
+      this.saveAction.run();
+    });
+  }
 
   addFile(uri: vscode.Uri) {
     const vertex = new FileVertex(uri);
@@ -102,31 +125,40 @@ class JumpNet {
     this.currentUri = uri;
   }
 
-  async relatedCommand() {
-    if (!vscode.window.activeTextEditor) return;
-    const uri = vscode.window.activeTextEditor.document.uri;
-    const items: vscode.QuickPickItem[] = [];
-    const maxItems = 10;
+  relatedFiles(uri: vscode.Uri, maxItems: number = 10) {
+    const items: vscode.Uri[] = [];
 
     for (const related of verticesByWeight(
       this.jumpGraph,
       new FileVertex(uri)
     )) {
-      items.push({
-        label: related.id,
-      });
+      items.push(vscode.Uri.from(related.uri));
       if (items.length >= maxItems) break;
     }
 
+    return items;
+  }
+
+  async relatedCommand() {
+    if (!vscode.window.activeTextEditor) return;
+
+    const uris = this.relatedFiles(
+      vscode.window.activeTextEditor.document.uri,
+      10
+    );
+    const items: vscode.QuickPickItem[] = uris.map((uri) => ({
+      label: uri.fsPath,
+    }));
+
     const item = await vscode.window.showQuickPick(items, {});
     if (!item) return;
-    const vertex = this.jumpGraph.getVertex(item.label);
-    if (!vertex) return;
+    const uri = uris.find((uri) => uri.fsPath === item.label);
+    if (!uri) return;
 
     this.ignoreOpen = true;
 
     return vscode.workspace
-      .openTextDocument(vertex.fsPath)
+      .openTextDocument(uri.fsPath)
       .then(vscode.window.showTextDocument)
       .then(() => (this.ignoreOpen = false));
   }
@@ -135,7 +167,6 @@ class JumpNet {
     const storageUri = this.context.storageUri;
     if (!storageUri) throw new Error("No storage uri");
 
-    const data = serialize(this.jumpGraph);
     let workspaceName = vscode.workspace.name;
     if (!workspaceName && vscode.workspace.workspaceFolders) {
       if (vscode.workspace.workspaceFolders[0]) {
@@ -154,8 +185,10 @@ class JumpNet {
 
   async load() {
     const filePath = this.storagePath();
-    const data = await fs.readFile(filePath, { encoding: "utf-8" });
-    this.jumpGraph = deserialize(data);
+    const data = JSON.parse(await fs.readFile(filePath, { encoding: "utf-8" }));
+    if (data.version !== SCHEMA_VERSION)
+      throw new Error("Invalid data version");
+    this.jumpGraph = WeightedGraph.fromJSON(data);
     console.log("loaded jumpnet from", filePath);
   }
 
@@ -173,7 +206,11 @@ class JumpNet {
     }
 
     console.log("writing to", filePath);
-    await fs.writeFile(filePath, serialize(this.jumpGraph), {
+
+    const data = this.jumpGraph.toJSON() as any;
+    data.version = SCHEMA_VERSION;
+
+    await fs.writeFile(filePath, JSON.stringify(data), {
       encoding: "utf-8",
     });
   }
