@@ -62,6 +62,13 @@ export class WeightedGraph<V extends Vertex> extends EventEmitter {
     super();
   }
 
+  clear() {
+    this.verts.clear();
+    this.edges.clear();
+    this.edgeMap.clear();
+    this.emit("onClear");
+  }
+
   addVertex(vertex: V) {
     const { id } = vertex;
     this.verts.set(id, vertex);

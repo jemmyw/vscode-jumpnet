@@ -39,6 +39,7 @@ export class ThrottledAction extends EventEmitter {
       this.queue();
       return;
     }
+    this.timeout = null;
     this.running = true;
 
     try {

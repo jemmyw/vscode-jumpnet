@@ -24,14 +24,14 @@ export class JumpNet {
   // Do not record relations. Used to prevent recording when jumping to related
   ignoreOpen = false;
   // Save at most every 10s
-  saveAction = new ThrottledAction(() => this.save(), { rateMs: 10000 });
+  saveAction = new ThrottledAction(() => this.save(), { rateMs: 5000 });
   private relatedTreeProvider = new RelatedTreeDataProvider(this);
 
   constructor(public context: vscode.ExtensionContext) {}
 
   async activate() {
     try {
-      await this.load();
+      this.jumpGraph = await this.load();
     } catch (err) {
       console.log("Could not load jump net:", err);
       console.log("starting with fresh data");
@@ -42,7 +42,7 @@ export class JumpNet {
       console.error("Saving jump graph failed:", err);
     });
 
-    ["onVertexAdded", "onEdgeAdded"].forEach((event) =>
+    ["onVertexAdded", "onEdgeAdded", "onClear"].forEach((event) =>
       this.jumpGraph.on(event, () => this.saveAction.queue())
     );
 
@@ -148,7 +148,7 @@ export class JumpNet {
     );
     if (action !== "Yes") return;
 
-    this.jumpGraph = new WeightedGraph<FileVertex>();
+    this.jumpGraph.clear();
     this.saveAction.run();
     this.relatedTreeProvider.reset();
   }
@@ -178,8 +178,8 @@ export class JumpNet {
     const data = JSON.parse(await fs.readFile(filePath, { encoding: "utf-8" }));
     if (data.version !== SCHEMA_VERSION)
       throw new Error("Invalid data version");
-    this.jumpGraph = WeightedGraph.fromJSON(data);
     console.log("loaded jumpnet from", filePath);
+    return WeightedGraph.fromJSON<FileVertex>(data);
   }
 
   async save() {
